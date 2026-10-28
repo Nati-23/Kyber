@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kyber768 — Post-Quantum KEM</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #080c10;
+  --bg2:      #0d1117;
+  --panel:    #0f1923;
+  --border:   #1e3a4a;
+  --accent:   #00d4ff;
+  --green:    #00ff9d;
+  --orange:   #ff6b35;
+  --warn:     #ffd166;
+  --text:     #c8dde8;
+  --dim:      #4a7a90;
+  --mute:     #1e3040;
+  --success:  #00ff9d;
+  --error:    #ff4466;
+  --mono:     'Share Tech Mono', monospace;
+  --sans:     'Rajdhani', sans-serif;
+  --glow-b:   0 0 16px rgba(0,212,255,0.4);
+  --glow-g:   0 0 16px rgba(0,255,157,0.4);
+  --glow-o:   0 0 16px rgba(255,107,53,0.4);
+}
+
+html { font-size: 15px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* scanlines */
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+}
+/* grid */
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image: linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── Header ── */
+header {
+  position:relative; z-index:10;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(0,212,255,0.06) 0%, transparent 100%);
+  padding: 1.4rem 2rem;
+  display: flex; align-items: center; gap: 1.2rem;
+}
+.logo {
+  width:46px; height:46px; flex-shrink:0;
+  border: 2px solid var(--accent);
+  display:grid; place-items:center;
+  font-family:var(--mono); font-size:0.65rem; color:var(--accent);
+  box-shadow: var(--glow-b), inset 0 0 10px rgba(0,212,255,0.1);
+  animation: pulse 3s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100%{ box-shadow: var(--glow-b), inset 0 0 10px rgba(0,212,255,0.1); }
+  50%     { box-shadow: 0 0 28px rgba(0,212,255,0.65), inset 0 0 18px rgba(0,212,255,0.2); }
+}
+header h1 { font-weight:700; font-size:1.35rem; letter-spacing:.12em; text-transform:uppercase; color:#fff; }
+header p  { font-family:var(--mono); font-size:0.65rem; color:var(--dim); letter-spacing:.08em; margin-top:2px; }
+.status-pill {
+  margin-left:auto; font-family:var(--mono); font-size:0.62rem;
+  letter-spacing:.1em; padding:.3rem .8rem;
+  border:1px solid var(--green); color:var(--green);
+  box-shadow:0 0 8px rgba(0,255,157,.2);
+  display:flex; align-items:center; gap:.5rem;
+}
+.dot { width:6px;height:6px;border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 1.4s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── Layout ── */
+main { position:relative; z-index:10; max-width:1100px; margin:0 auto; padding:2rem 2rem 4rem; }
+
+/* ── Flow bar ── */
+.flow-bar {
+  display:flex; align-items:center; justify-content:center;
+  gap:0; margin-bottom:2rem;
+}
+.flow-step {
+  display:flex; flex-direction:column; align-items:center; gap:.35rem;
+  padding:.6rem 1.6rem; border:1px solid var(--border);
+  background:var(--panel); min-width:130px;
+  transition:border-color .3s, box-shadow .3s;
+}
+.flow-step.active  { border-color:var(--accent);  box-shadow:var(--glow-b); }
+.flow-step.done    { border-color:var(--green);   box-shadow:var(--glow-g); }
+.fs-num   { font-family:var(--mono); font-size:.6rem; color:var(--dim); letter-spacing:.1em; }
+.fs-label { font-weight:600; font-size:.8rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text); }
+.flow-step.active .fs-label { color:var(--accent); }
+.flow-step.done   .fs-label { color:var(--green);  }
+.flow-arrow { font-family:var(--mono); color:var(--mute); font-size:1.1rem; padding:0 .2rem; }
+.flow-arrow.lit { color:var(--accent); }
+
+/* ── Cards ── */
+.cards { display:grid; grid-template-columns:1fr 1fr; gap:1.4rem; margin-bottom:1.4rem; }
+.card-full { margin-bottom:1.4rem; }
+
+.card {
+  background:var(--panel); border:1px solid var(--border);
+  padding:1.5rem; position:relative; overflow:hidden;
+  transition:border-color .25s;
+}
+.card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  opacity:0; transition:opacity .3s;
+}
+.card:focus-within::before { opacity:1; }
+.card.c-blue::before  { background:linear-gradient(90deg, transparent, var(--accent),  transparent); }
+.card.c-green::before { background:linear-gradient(90deg, transparent, var(--green),   transparent); }
+.card.c-orange::before{ background:linear-gradient(90deg, transparent, var(--orange),  transparent); }
+
+.card-title {
+  font-weight:700; font-size:.78rem; letter-spacing:.18em; text-transform:uppercase;
+  margin-bottom:1.2rem; display:flex; align-items:center; gap:.6rem;
+}
+.card-title::before {
+  content:''; display:inline-block; width:8px;height:8px;
+  border:2px solid currentColor; transform:rotate(45deg); flex-shrink:0;
+}
+.c-blue  .card-title { color:var(--accent); }
+.c-green .card-title { color:var(--green);  }
+.c-orange.card-title-el { color:var(--orange); }
+.c-orange .card-title { color:var(--orange); }
+
+/* ── Form ── */
+.field { margin-bottom:.9rem; }
+.field label { display:block; font-family:var(--mono); font-size:.62rem; letter-spacing:.12em; color:var(--dim); text-transform:uppercase; margin-bottom:.35rem; }
+.field input {
+  width:100%; background:var(--bg2); border:1px solid var(--border);
+  color:var(--accent); font-family:var(--mono); font-size:.85rem;
+  padding:.55rem .8rem; outline:none; transition:border-color .2s, box-shadow .2s;
+}
+.field input:focus { border-color:var(--accent); box-shadow:var(--glow-b); }
+.field input::placeholder { color:var(--mute); }
+.field-hint { font-family:var(--mono); font-size:.6rem; color:var(--dim); margin-top:.3rem; }
+.field-hint span { color:var(--accent); }
+
+/* ── Buttons ── */
+.btn {
+  width:100%; padding:.7rem 1rem; font-family:var(--sans); font-weight:700;
+  font-size:.85rem; letter-spacing:.2em; text-transform:uppercase;
+  cursor:pointer; border:none; transition:all .2s; position:relative; overflow:hidden;
+  margin-top:.3rem;
+}
+.btn:disabled { opacity:.35; cursor:not-allowed; box-shadow:none !important; }
+.btn:active { transform:translateY(1px); }
+.btn-blue   { background:var(--accent);  color:var(--bg); box-shadow:var(--glow-b); }
+.btn-green  { background:var(--green);   color:var(--bg); box-shadow:var(--glow-g); }
+.btn-orange { background:var(--orange);  color:#fff;      box-shadow:var(--glow-o); }
+.btn-blue:hover   { box-shadow:0 0 28px rgba(0,212,255,.7); }
+.btn-green:hover  { box-shadow:0 0 28px rgba(0,255,157,.7); }
+.btn-orange:hover { box-shadow:0 0 28px rgba(255,107,53,.7); }
+
+.spinner { display:none; width:13px;height:13px; border:2px solid rgba(0,0,0,.2); border-top-color:currentColor; border-radius:50%; animation:spin .7s linear infinite; margin-left:.5rem; vertical-align:middle; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.busy .spinner { display:inline-block; }
+
+/* ── Terminal ── */
+.terminal {
+  background:#050810; border:1px solid var(--border);
+  padding:1.2rem 1.4rem; font-family:var(--mono); font-size:.78rem;
+  line-height:1.75; color:#6a9ab0; min-height:220px; max-height:340px;
+  overflow-y:auto;
+}
+.term-bar {
+  display:flex; align-items:center; gap:.45rem; margin-bottom:.8rem;
+  padding-bottom:.6rem; border-bottom:1px solid var(--border);
+  font-size:.62rem; letter-spacing:.12em; color:var(--dim); text-transform:uppercase;
+}
+.td{width:8px;height:8px;border-radius:50%;}
+.td.r{background:#ff5f57;} .td.y{background:#febc2e;} .td.g{background:#28c840;}
+.terminal pre { white-space:pre-wrap; word-break:break-all; }
+.t-ok   { color:var(--success); }
+.t-key  { color:var(--accent); }
+.t-info { color:var(--warn); }
+.t-err  { color:var(--error); }
+.t-dim  { color:var(--mute); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-track{background:var(--bg2);} ::-webkit-scrollbar-thumb{background:var(--border);}
+
+/* ── Footer ── */
+footer {
+  position:relative; z-index:10; border-top:1px solid var(--border);
+  padding:1rem 2rem; font-family:var(--mono); font-size:.6rem;
+  color:var(--mute); letter-spacing:.08em; display:flex; justify-content:space-between;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">KEM</div>
+  <div>
+    <h1>Kyber768 &mdash; Post-Quantum KEM</h1>
+    <p>CRYSTALS-KYBER &nbsp;|&nbsp; ML-KEM-768 &nbsp;|&nbsp; NIST FIPS 203</p>
+  </div>
+  <div class="status-pill"><span class="dot"></span> SERVER ONLINE</div>
+</header>
+
+<main>
+
+  <!-- Flow bar -->
+  <div class="flow-bar">
+    <div class="flow-step" id="fl1"><span class="fs-num">01</span><span class="fs-label">KeyGen</span></div>
+    <div class="flow-arrow" id="fa1">──▶</div>
+    <div class="flow-step" id="fl2"><span class="fs-num">02</span><span class="fs-label">Encrypt</span></div>
+    <div class="flow-arrow" id="fa2">──▶</div>
+    <div class="flow-step" id="fl3"><span class="fs-num">03</span><span class="fs-label">Decrypt</span></div>
+  </div>
+
+  <!-- Cards row -->
+  <div class="cards">
+
+    <!-- Key Generation -->
+    <div class="card c-blue">
+      <div class="card-title">Key Generation</div>
+      <div class="field">
+        <label>Key Pair Name</label>
+        <input type="text" id="keyName" value="kyber_key" placeholder="e.g. alice" />
+        <div class="field-hint">Creates &nbsp;<span id="hint-pub">kyber_key_pub.txt</span>&nbsp; and &nbsp;<span id="hint-sec">kyber_key_sec.txt</span></div>
+      </div>
+      <button class="btn btn-blue" id="btn-kg" onclick="doKeygen()">Generate Keys <span class="spinner"></span></button>
+    </div>
+
+    <!-- Encrypt -->
+    <div class="card c-green">
+      <div class="card-title">Encrypt Message</div>
+      <div class="field">
+        <label>Public Key File</label>
+        <input type="text" id="pubFile" placeholder="kyber_key_pub.txt" />
+      </div>
+      <div class="field">
+        <label>Message</label>
+        <input type="text" id="message" placeholder="Enter your secret message" />
+      </div>
+      <div class="field">
+        <label>Encryption Name</label>
+        <input type="text" id="encName" placeholder="e.g. msg1" />
+        <div class="field-hint">Creates &nbsp;<span id="hint-enc">{name}_encrypted.txt</span>, &nbsp;<span>{name}_ciphertext.txt</span></div>
+      </div>
+      <button class="btn btn-green" id="btn-enc" onclick="doEncrypt()">Encrypt <span class="spinner"></span></button>
+    </div>
+
+  </div>
+
+  <!-- Decrypt (full width) -->
+  <div class="card-full">
+    <div class="card c-orange">
+      <div class="card-title" style="color:var(--orange)">Decrypt Message</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="field">
+          <label>Secret Key File</label>
+          <input type="text" id="secFile" placeholder="kyber_key_sec.txt" />
+        </div>
+        <div class="field">
+          <label>Encryption Name</label>
+          <input type="text" id="decName" placeholder="e.g. msg1" />
+        </div>
+      </div>
+      <button class="btn btn-orange" id="btn-dec" onclick="doDecrypt()">Decrypt <span class="spinner"></span></button>
+    </div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="terminal">
+    <div class="term-bar">
+      <span class="td r"></span><span class="td y"></span><span class="td g"></span>
+      <span style="margin-left:.4rem">kyber768 // stdout</span>
+    </div>
+    <pre id="term">// Waiting for operation...</pre>
+  </div>
+
+</main>
+
+<footer>
+  <span>CRYSTALS-KYBER768 &mdash; NIST PQC FIPS 203</span>
+  <span>MyOQS v1.0.0 &nbsp;&bull;&nbsp; Node.js child_process bridge &nbsp;&bull;&nbsp; localhost:3000</span>
+</footer>
+
+<script>
+// ── Flow tracker ────────────────────────────────────────────────
+const done = new Set();
+function setFlow(step) {
+  done.add(step);
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('fl'+i);
+    const ar = document.getElementById('fa'+i);
+    el.classList.remove('active','done');
+    if (i === step) el.classList.add('active');
+    else if (done.has(i)) el.classList.add('done');
+    if (ar && done.has(i)) ar.classList.add('lit');
+  });
+}
+
+// ── Terminal renderer ────────────────────────────────────────────
+function termPrint(raw) {
+  const t = document.getElementById('term');
+  if (!raw) { t.innerHTML = '<span class="t-dim">// No output</span>'; return; }
+  t.innerHTML = raw.split('\n').map(l => {
+    l = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if (l.startsWith('ERROR') || l.includes('ERROR:')) return `<span class="t-err">${l}</span>`;
+    if (l.includes('successfully'))     return `<span class="t-ok">${l}</span>`;
+    if (l.includes('Recovered message'))return `<span class="t-ok">${l}</span>`;
+    if (l.includes('saved:') || l.includes('saved'))  return `<span class="t-key">${l}</span>`;
+    if (l.includes('preview'))          return `<span class="t-info">${l}</span>`;
+    return `<span>${l}</span>`;
+  }).join('\n');
+  t.parentElement.scrollTop = t.parentElement.scrollHeight;
+}
+
+function setLoading(btnId, on) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = on;
+  btn.classList.toggle('busy', on);
+}
+
+// ── Live hints ───────────────────────────────────────────────────
+document.getElementById('keyName').addEventListener('input', function() {
+  const n = this.value || 'kyber_key';
+  document.getElementById('hint-pub').textContent = n + '_pub.txt';
+  document.getElementById('hint-sec').textContent = n + '_sec.txt';
+  document.getElementById('pubFile').placeholder  = n + '_pub.txt';
+  document.getElementById('secFile').placeholder  = n + '_sec.txt';
+});
+document.getElementById('encName').addEventListener('input', function() {
+  const n = this.value || '{name}';
+  document.getElementById('hint-enc').textContent = n + '_encrypted.txt';
+  document.getElementById('decName').placeholder  = n;
+});
+
+// ── API call ─────────────────────────────────────────────────────
+async function api(option, inputs) {
+  const res  = await fetch('/api/run', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ option, inputs })
+  });
+  return await res.json();
+}
+
+// ── 1. Keygen ────────────────────────────────────────────────────
+async function doKeygen() {
+  const name = document.getElementById('keyName').value.trim();
+  if (!name) { alert('Enter a key pair name first.'); return; }
+  setLoading('btn-kg', true);
+  setFlow(1);
+  termPrint('// Generating key pair...');
+  try {
+    const d = await api(1, [name]);
+    termPrint(d.success ? d.output : 'ERROR: ' + d.error);
+    if (d.success) done.add(1), setFlow(1);
+  } catch(e) { termPrint('ERROR: ' + e.message + '\n// Is node server.js running?'); }
+  setLoading('btn-kg', false);
+}
+
+// ── 2. Encrypt ───────────────────────────────────────────────────
+async function doEncrypt() {
+  const pub = document.getElementById('pubFile').value.trim() || document.getElementById('pubFile').placeholder;
+  const msg = document.getElementById('message').value.trim();
+  const enc = document.getElementById('encName').value.trim();
+  if (!pub || !msg || !enc) { alert('Fill in all encrypt fields.'); return; }
+  setLoading('btn-enc', true);
+  setFlow(2);
+  termPrint('// Encrypting message...');
+  try {
+    const d = await api(2, [pub, msg, enc]);
+    termPrint(d.success ? d.output : 'ERROR: ' + d.error);
+    if (d.success) { done.add(2); setFlow(2); document.getElementById('decName').placeholder = enc; }
+  } catch(e) { termPrint('ERROR: ' + e.message); }
+  setLoading('btn-enc', false);
+}
+
+// ── 3. Decrypt ───────────────────────────────────────────────────
+async function doDecrypt() {
+  const sec = document.getElementById('secFile').value.trim() || document.getElementById('secFile').placeholder;
+  const dec = document.getElementById('decName').value.trim() || document.getElementById('decName').placeholder;
+  if (!sec || !dec) { alert('Fill in secret key file and encryption name.'); return; }
+  setLoading('btn-dec', true);
+  setFlow(3);
+  termPrint('// Decrypting message...');
+  try {
+    const d = await api(3, [sec, dec]);
+    termPrint(d.success ? d.output : 'ERROR: ' + d.error);
+    if (d.success) { done.add(3); setFlow(3); }
+  } catch(e) { termPrint('ERROR: ' + e.message); }
+  setLoading('btn-dec', false);
+}
+
+// ── Enter key shortcuts ──────────────────────────────────────────
+document.addEventListener('keypress', e => {
+  if (e.key !== 'Enter') return;
+  const id = document.activeElement.id;
+  if (id === 'keyName')              doKeygen();
+  if (['pubFile','message','encName'].includes(id)) doEncrypt();
+  if (['secFile','decName'].includes(id))           doDecrypt();
+});
+</script>
+</body>
+</html>

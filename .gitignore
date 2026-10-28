@@ -1,0 +1,23 @@
+# Build directories
+build/
+bin/
+out/
+
+# Executables and libraries
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.obj
+*.o
+
+# Node dependencies
+node_modules/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
